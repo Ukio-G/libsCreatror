@@ -12,6 +12,9 @@ cat > Makefile <<EOF
 CXXFLAGS = -fPIC
 NAME=lib$LIBNAME.so
 OBJDIR=objs
+SHARED_INSTALL_DIR=/usr/lib
+HEADER_INSTALL_DIR=/usr/include
+HEADERS=$LIBNAME.h
 
 OBJS=\$(patsubst %.cpp,%.o,\$(addprefix \$(OBJDIR)/,\$(wildcard *.cpp)))
 
@@ -21,6 +24,22 @@ OBJS=\$(patsubst %.cpp,%.o,\$(addprefix \$(OBJDIR)/,\$(wildcard *.cpp)))
 \$(addprefix \$(OBJDIR)/, %o): %cpp
 	@mkdir -p \$(OBJDIR)
 	\$(CXX) \$(CXXFLAGS) -c $< -o \$@
+
+all: $LIBNAME
+
+install:
+	cp \$(NAME) \$(SHARED_INSTALL_DIR)
+	cp \$(HEADERS) \$(HEADER_INSTALL_DIR)
+
+delete:
+	rm -f \$(SHARED_INSTALL_DIR)/\$(NAME)
+	rm -f \$(HEADER_INSTALL_DIR)/\$(HEADERS)
+
+clean:
+	rm -rf objs \$(NAME)
+
+.PHONY: install delete clean all
+
 EOF
 }
 
