@@ -1,5 +1,8 @@
 #!/usr/bin/bash
 
+CMAKE_MIN_VERSION="3.9"
+CXX_STANDART=14
+
 if [[ $# -lt 1 ]]; then
 	echo "Illegal number of parameters"
 	exit 1
@@ -9,12 +12,13 @@ LIBNAME=$1
 
 function createMakefile() {
 cat > Makefile <<EOF
-CXXFLAGS = -fPIC
+CXXFLAGS = -fPIC -std=c++$CXX_STANDART
 NAME=lib$LIBNAME.so
 OBJDIR=objs
 DESTDIR :=
 PREFIX := /usr
 HEADERS=$LIBNAME.h
+INCLUDE_DIR=include
 
 OBJS=\$(patsubst %.cpp,%.o,\$(addprefix \$(OBJDIR)/,\$(wildcard *.cpp)))
 
@@ -23,17 +27,21 @@ OBJS=\$(patsubst %.cpp,%.o,\$(addprefix \$(OBJDIR)/,\$(wildcard *.cpp)))
 
 \$(addprefix \$(OBJDIR)/, %o): %cpp
 	@mkdir -p \$(OBJDIR)
-	\$(CXX) \$(CXXFLAGS) -c $< -o \$@
+	\$(CXX) \$(CXXFLAGS) -Iinclude -c $< -o \$@
 
 all: $LIBNAME
 
 install:
 	install -D -m755 \$(NAME) \$(DESTDIR)\$(PREFIX)/lib/\$(NAME)
-	install -D -m644 \$(HEADERS) \$(DESTDIR)\$(PREFIX)/include/\$(HEADERS)
+	for file in \$(HEADERS); do \\
+		install -D -m644 \$(INCLUDE_DIR)/\$\$file \$(DESTDIR)\$(PREFIX)/\$(INCLUDE_DIR)/\$\$file ; \\
+	done
 
 uninstall:
-	rm -f \$(DESTDIR)/\$(NAME)
-	rm -f \$(DESTDIR)\$(PREFIX)/include/\$(HEADERS)
+	rm -f \$(DESTDIR)\$(PREFIX)/lib/\$(NAME)
+	for file in \$(HEADERS); do \\
+		rm -f \$(DESTDIR)\$(PREFIX)/\$(INCLUDE_DIR)/\$\$file ; \\
+	done
 
 clean:
 	rm -rf objs \$(NAME)
@@ -45,14 +53,14 @@ EOF
 
 function createCMake() {
 cat > CMakeLists.txt <<EOF
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION $CMAKE_MIN_VERSION)
 project(lib$LIBNAME)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD $CXX_STANDART)
 
 file(GLOB SRCS *.cpp)
-
 add_library($LIBNAME SHARED \${SRCS})
+target_include_directories($LIBNAME include)
 EOF
 }
 
@@ -115,6 +123,8 @@ std::ostream& operator<<(std::ostream &stream, const $LIBNAME& obj) {
 
 EOF
 
+mkdir include && cd include
+
 cat > $LIBNAME.h <<EOF
 #include <iostream>
 
@@ -133,7 +143,89 @@ std::ostream& operator<<(std::ostream &stream, const $LIBNAME& obj);
 EOF
 }
 
-SRC_DIR=lib$LIBNAME-src
+
+function createArchPackage()
+{
+	NAME=$(git config user.name)
+	VER="0.1"
+cat > PKGBUILD<<EOF
+
+# This is an example PKGBUILD file. Use this as a start to creating your own,
+# and remove these comments. For more information, see 'man PKGBUILD'.
+# NOTE: Please fill out the license field for your package! If it is unknown,
+# then please put 'unknown'.
+
+# Maintainer: Your Name <youremail@domain.com>
+pkgname=$SRC_DIR
+pkgver=$VER
+pkgrel=1
+# pkgdir=/usr/lib
+epoch=
+pkgdesc="Libs provide print bytes"
+arch=("x86_64")
+url=""
+license=('GPL')
+groups=()
+depends=()
+makedepends=()
+checkdepends=()
+optdepends=()
+provides=()
+conflicts=()
+replaces=()
+backup=()
+options=()
+install=
+changelog=
+source=("\$pkgname-\$pkgver.tar.gz")
+noextract=()
+md5sums=()
+validpgpkeys=()
+
+prepare() {
+	cd "\$pkgname-\$pkgver"
+	# patch -p1 -i "\$srcdir/\$pkgname-\$pkgver.patch"
+}
+
+build() {
+	cd "\$pkgname-\$pkgver"
+	# ./configure --prefix=/usr
+	make
+}
+
+check() {
+	cd "\$pkgname-\$pkgver"
+	# make -k check
+}
+
+package() {
+	cd "\$pkgname-\$pkgver"
+	make DESTDIR=\$pkgdir install
+}
+EOF
+
+PKG_DIR=$SRC_DIR-$VER
+
+mkdir $PKG_DIR
+cp *.cpp Makefile $PKG_DIR 
+cp -r include $PKG_DIR
+tar -cvf $PKG_DIR.tar.gz $PKG_DIR
+makepkg --nocheck --skipchecksums -f
+}
+
+SRC_DIR=lib$LIBNAME
+
+if [ "$1" = "make_package" ]; then
+	SRC_DIR=${PWD##*/}
+
+	if [ "$2" = "pacman" ]; then
+		createArchPackage
+		exit 0
+	else
+		echo "Package manager not supported."
+		exit 1
+	fi
+fi
 
 mkdir $SRC_DIR
 cd $SRC_DIR
@@ -141,4 +233,3 @@ cd $SRC_DIR
 determinateBuildSystem $2
 createBuildSystemFile
 createBaseSources
-
