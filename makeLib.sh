@@ -33,26 +33,30 @@ set(CMAKE_CXX_STANDARD 14)
 
 file(GLOB SRCS *.cpp)
 
-add_library(lib$LIBNAME SHARED \${SRCS})
+add_library($LIBNAME SHARED \${SRCS})
 EOF
 }
 
 function determinateBuildSystem() {
-	if [[ $# -ge 2 ]]; then
-		if [ "$2" = "Makefile" ]; then
+	if [ ! -z $1 ]; then
+		if [ "$1" = "Makefile" ]; then
+			echo "Selected Makefile project"
 			BUILD_SYSTEM=Makefile
-		elif [ "$2" = "CMake" ]; then
+		elif [ "$1" = "CMake" ]; then
+			echo "Selected CMake project"
 			BUILD_SYSTEM=CMake
 		else
-			echo "Undefined build system. Possible values: Makefile|CMake"
+			echo "Undefined build system. Possible values: Makefile|CMake. Passed $1"
 			exit 1
 		fi
 	else
+		echo "Project type not selected. Use default value (Makefile)"
 		BUILD_SYSTEM=Makefile
 	fi
 }
 
 function createBuildSystemFile() {
+	echo "Create $BUILD_SYSTEM project"
 	if [ "$BUILD_SYSTEM" = "Makefile" ]; then
 		createMakefile
 	elif [ "$BUILD_SYSTEM" = "CMake" ]; then
@@ -115,7 +119,7 @@ SRC_DIR=lib$LIBNAME-src
 mkdir $SRC_DIR
 cd $SRC_DIR
 
-determinateBuildSystem
+determinateBuildSystem $2
 createBuildSystemFile
 createBaseSources
 
